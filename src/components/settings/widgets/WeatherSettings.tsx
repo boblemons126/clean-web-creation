@@ -4,17 +4,16 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { MapPin, Thermometer, RefreshCw, Move, Wind, Cloud, Palette, Check, Sun, Droplets, Trash2 } from 'lucide-react';
+import { MapPin, Thermometer, RefreshCw, Move, Wind, Cloud, Palette, Check, Sun, Droplets, Trash2, Search, Loader2, Plus } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { getWeatherIcon } from '@/utils/weatherUtils';
-import CustomLocationsList from './CustomLocationsList';
+import { useLocationContext, CustomLocation } from '@/contexts/LocationContext';
+import { searchLocationsEnhanced } from '@/services/locationSearchService';
 import { Input } from '@/components/ui/input';
-import { useLocationContext } from '@/contexts/LocationContext';
-import { geocodeLocation, searchLocations } from '@/services/openWeatherService';
 
 // Expanded color presets with more shades
 const colorPresets = [
@@ -55,6 +54,12 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
   const [selectedTab, setSelectedTab] = useState('picker');
   const [hoveredColor, setHoveredColor] = useState<string | null>(null);
   
+  // Location Search State
+  const { customLocations, addCustomLocation, removeCustomLocation } = useLocationContext();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  
   // HSL state for color picker
   const [hue, setHue] = useState(0);
   const [saturation, setSaturation] = useState(100);
@@ -64,6 +69,20 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (searchQuery) {
+      const performSearch = async () => {
+        setIsSearching(true);
+        const results = await searchLocationsEnhanced(searchQuery);
+        setSearchResults(results);
+        setIsSearching(false);
+      };
+      performSearch();
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -524,18 +543,60 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
             />
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-white/10">
-            <div>
-              <Label className="text-white text-base font-medium mb-2 block">Custom Locations</Label>
-              <p className="text-sm text-gray-300 mb-4">
-                Manage your saved custom locations.
-              </p>
+          <div className="space-y-4">
+            <Label className="text-white">Add Custom Location</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search for a city or postcode..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 bg-white/10 border-white/20 text-white"
+              />
+              {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
             </div>
-            
-            <div className="pt-2">
-              <CustomLocationsList />
-            </div>
+            {searchResults.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-lg max-h-48 overflow-y-auto">
+                <ul className="divide-y divide-white/10">
+                  {searchResults.map((result) => (
+                    <li
+                      key={result.latitude + result.longitude}
+                      className="p-3 hover:bg-white/10 cursor-pointer flex items-center justify-between"
+                      onClick={() => {
+                        addCustomLocation({
+                          id: `${result.latitude},${result.longitude}`,
+                          name: result.name,
+                          latitude: result.latitude,
+                          longitude: result.longitude,
+                        });
+                        setSearchQuery('');
+                      }}
+                    >
+                      <div>
+                        <p className="font-medium text-white">{result.name}</p>
+                        <p className="text-xs text-gray-400">{result.state || result.country}</p>
+                      </div>
+                      <Plus className="w-4 h-4 text-green-400" />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
+
+          {customLocations.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-white">Saved Locations</Label>
+              {customLocations.map((location) => (
+                <div key={location.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                  <span className="text-white">{location.name}</span>
+                  <Button variant="ghost" size="sm" onClick={() => removeCustomLocation(location.id)}>
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

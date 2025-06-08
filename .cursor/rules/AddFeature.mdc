@@ -1,0 +1,120 @@
+---
+description: This rule defines the parameters for when the ai is prompted to add a "New Feature"
+globs: 
+alwaysApply: false
+---
+# Cursor AI Feature Development Rule
+
+## Primary Directive
+When I request a new feature to be added to the project, you MUST follow this comprehensive workflow to maintain consistency, documentation, and project coherence.
+
+## Step 1: Create Master Context Document
+**IMMEDIATELY** create a new `.md` file in the directory:
+`C:\Users\user\Documents\GitHub\clean-web-creation\Feature Creation Context\`
+
+**File naming convention:** `[feature-name]-context.md`
+
+## Step 2: Feature Discovery & Refinement
+Before any implementation, you MUST:
+
+1. **Ask clarifying questions** to understand:
+   - User requirements and acceptance criteria
+   - Integration points with existing features
+   - Performance and scalability requirements
+   - Security considerations
+   - User experience expectations
+
+2. **Provide suggestions** for:
+   - Alternative approaches or implementations
+   - Potential improvements or enhancements
+   - Best practices for the specific feature type
+   - Technology choices and trade-offs
+
+3. **Generate an advanced prompt** based on our discussion and ask me to verify it's acceptable before proceeding
+
+## Step 3: Comprehensive Feature Documentation
+The master context file MUST include ALL of the following sections:
+
+### Feature Overview
+- **Name & Purpose**: Clear description of what this feature does
+- **User Impact**: How this affects the end user experience
+- **Business Value**: Why this feature is important
+- **Priority Level**: Critical/High/Medium/Low
+- **Estimated Complexity**: Simple/Medium/Complex
+
+### Technical Specification
+- **Architecture Overview**: How this feature fits into the overall system
+- **Core Logic**: Detailed explanation of the main functionality
+- **Data Flow**: How information moves through the feature
+- **Error Handling**: How failures and edge cases are managed
+- **Performance Considerations**: Expected load, caching, optimization needs
+
+### Dependencies & Integration
+- **Database Requirements**: 
+  - New tables/collections needed
+  - Schema changes to existing data
+  - Migration scripts required
+- **API Integration**:
+  - External APIs consumed
+  - Internal APIs created/modified
+  - Authentication requirements
+- **File Dependencies**:
+  - Files that need to import this feature
+  - Files this feature will import
+  - New files to be created
+- **Environment Variables**: New config needed
+
+### Implementation Plan
+- **Development Phases**: Break down into logical steps
+- **Acceptance Criteria**: Specific testable requirements
+- **Testing Strategy**: Unit, integration, and E2E test requirements
+- **Deployment Considerations**: Rollout strategy, feature flags, rollback plan
+
+### Live Tracking
+- **Current Status**: Not Started/In Progress/Testing/Complete
+- **Next Actions**: Immediate next steps
+- **Blockers**: Current obstacles or dependencies
+- **Recent Updates**: Latest changes or progress
+
+### Change History
+- **Version Log**: All modifications with timestamps
+- **Decision Log**: Major technical decisions and rationale
+- **Issue Tracking**: Problems encountered and solutions
+
+### Quality Assurance
+- **Code Review Checklist**: Standards this feature must meet
+- **Security Review**: Potential vulnerabilities and mitigations
+- **Performance Benchmarks**: Expected metrics and thresholds
+
+## Step 4: Continuous Reference & Updates
+Throughout development:
+- **ALWAYS reference this context file** before making decisions
+- **UPDATE the file** after each significant change
+- **Maintain change history** with detailed explanations
+- **Keep status current** so progress is always visible
+- **Use as checklist** to ensure nothing is missed
+
+## Step 5: Feature Completion Verification
+Before marking complete, verify:
+- [ ] All acceptance criteria met
+- [ ] All files documented and integrated
+- [ ] Testing completed and passing
+- [ ] Documentation updated
+- [ ] Performance benchmarks met
+- [ ] Security review passed
+- [ ] Change history complete
+
+## Critical Rules
+1. **NEVER start implementation** without completing the context document
+2. **ALWAYS ask questions** before assuming requirements
+3. **MUST update context file** with every significant change
+4. **REFERENCE context file** in every response about this feature
+5. **MAINTAIN focus** on the documented requirements and scope
+
+## Template Location
+Use this structure for every feature context file to maintain consistency across all features.
+
+---
+
+*This rule ensures every feature is properly planned, documented, and tracked for maximum development efficiency and project maintainability.*
+

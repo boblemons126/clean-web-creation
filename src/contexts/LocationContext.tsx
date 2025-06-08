@@ -10,10 +10,10 @@ export interface CustomLocation {
 
 interface LocationContextType {
   customLocations: CustomLocation[];
-  addCustomLocation: (location: Omit<CustomLocation, 'id'>) => void;
-  removeCustomLocation: (id: string) => void;
   selectedLocationId: string | null;
   setSelectedLocationId: (id: string | null) => void;
+  addCustomLocation: (location: CustomLocation) => void;
+  removeCustomLocation: (id: string) => void;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
@@ -47,6 +47,24 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   });
 
+  const addCustomLocation = (location: CustomLocation) => {
+    setCustomLocations(prevLocations => {
+      // Avoid adding duplicates
+      if (prevLocations.some(l => l.id === location.id)) {
+        return prevLocations;
+      }
+      return [...prevLocations, location];
+    });
+  };
+
+  const removeCustomLocation = (id: string) => {
+    setCustomLocations(prevLocations => prevLocations.filter(l => l.id !== id));
+    // If the removed location was the selected one, reset to current location
+    if (selectedLocationId === id) {
+      setSelectedLocationId(null);
+    }
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem('customLocations', JSON.stringify(customLocations));
@@ -63,29 +81,14 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [selectedLocationId]);
 
-  const addCustomLocation = (location: Omit<CustomLocation, 'id'>) => {
-    const newLocation: CustomLocation = {
-      ...location,
-      id: Date.now().toString(),
-    };
-    setCustomLocations(prev => [...prev, newLocation]);
-  };
-
-  const removeCustomLocation = (id: string) => {
-    setCustomLocations(prev => prev.filter(loc => loc.id !== id));
-    if (selectedLocationId === id) {
-      setSelectedLocationId(null);
-    }
-  };
-
   return (
     <LocationContext.Provider
       value={{
         customLocations,
-        addCustomLocation,
-        removeCustomLocation,
         selectedLocationId,
         setSelectedLocationId,
+        addCustomLocation,
+        removeCustomLocation,
       }}
     >
       {children}

@@ -31,11 +31,6 @@ const WeatherWidget = () => {
   const weatherSettings = settings.widgets.find(w => w.id === 'weather')?.config || {};
   const [showHourly, setShowHourly] = useState(true);
 
-  const onLocationChange = (locationId: string | null) => {
-    setSelectedLocationId(locationId);
-    handleLocationChange(locationId);
-  };
-
   const getBackgroundStyle = () => {
     // Only use custom color if dynamic coloring is disabled and a custom color is set
     if (!weatherSettings.useDynamicColoring && weatherSettings.customBackgroundColor) {
@@ -133,7 +128,7 @@ const WeatherWidget = () => {
               location={convertedWeather.location}
               county={convertedWeather.county}
               onRefresh={refetch}
-              onLocationChange={onLocationChange}
+              onLocationChange={handleLocationChange}
               hideRefreshButton={true}
             />
           </div>

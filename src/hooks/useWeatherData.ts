@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getWeatherData } from '../services/weather';
 import type { WeatherData } from '../types/weather';
 import { useLocationContext } from '../contexts/LocationContext';
@@ -9,18 +8,20 @@ export const useWeatherData = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const { customLocations, selectedLocationId } = useLocationContext();
+  const { customLocations, selectedLocationId, setSelectedLocationId } = useLocationContext();
 
-  const fetchWeatherData = async (customLat?: number, customLon?: number) => {
+  const fetchWeatherData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
       let latitude: number, longitude: number;
+      
+      const selectedLocation = customLocations.find(loc => loc.id === selectedLocationId);
 
-      if (customLat !== undefined && customLon !== undefined) {
-        latitude = customLat;
-        longitude = customLon;
+      if (selectedLocation) {
+        latitude = selectedLocation.latitude;
+        longitude = selectedLocation.longitude;
       } else {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -53,58 +54,22 @@ export const useWeatherData = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLocationChange = (locationId: string | null) => {
-    if (locationId) {
-      const customLocation = customLocations.find(loc => loc.id === locationId);
-      if (customLocation) {
-        fetchWeatherData(customLocation.latitude, customLocation.longitude);
-      }
-    } else {
-      fetchWeatherData();
-    }
-  };
+  }, [selectedLocationId, customLocations]);
 
   useEffect(() => {
-    if (selectedLocationId) {
-      const customLocation = customLocations.find(loc => loc.id === selectedLocationId);
-      if (customLocation) {
-        fetchWeatherData(customLocation.latitude, customLocation.longitude);
-      }
-    } else {
-      fetchWeatherData();
-    }
+    fetchWeatherData();
     
-    const interval = setInterval(() => {
-      if (selectedLocationId) {
-        const customLocation = customLocations.find(loc => loc.id === selectedLocationId);
-        if (customLocation) {
-          fetchWeatherData(customLocation.latitude, customLocation.longitude);
-        }
-      } else {
-        fetchWeatherData();
-      }
-    }, 600000);
+    const interval = setInterval(fetchWeatherData, 600000); // 10 minutes
     
     return () => clearInterval(interval);
-  }, [selectedLocationId, customLocations]);
+  }, [fetchWeatherData]);
 
   return {
     weather,
     loading,
     error,
     lastUpdated,
-    refetch: () => {
-      if (selectedLocationId) {
-        const customLocation = customLocations.find(loc => loc.id === selectedLocationId);
-        if (customLocation) {
-          fetchWeatherData(customLocation.latitude, customLocation.longitude);
-        }
-      } else {
-        fetchWeatherData();
-      }
-    },
-    handleLocationChange
+    refetch: fetchWeatherData,
+    handleLocationChange: setSelectedLocationId
   };
 };

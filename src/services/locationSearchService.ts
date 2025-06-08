@@ -1,4 +1,3 @@
-
 interface LocationResult {
   name: string;
   latitude: number;

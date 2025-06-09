@@ -641,10 +641,7 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
           {/* Enhanced Location Search */}
           <div className="space-y-4">
             <div>
-              <Label className="text-white flex items-center">
-                <Star className="w-4 h-4 mr-2 text-yellow-400" />
-                Add New Location
-              </Label>
+              <Label className="text-white">Add New Location</Label>
               <p className="text-sm text-gray-300">Search and add locations worldwide</p>
             </div>
 

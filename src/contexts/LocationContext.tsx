@@ -1,97 +1,127 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface CustomLocation {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
+  county?: string;
+  country?: string;
   postcode?: string;
+  type?: 'city' | 'town' | 'village' | 'postcode' | 'county';
 }
 
 interface LocationContextType {
   customLocations: CustomLocation[];
   selectedLocationId: string | null;
-  setSelectedLocationId: (id: string | null) => void;
+  favoriteLocations: string[];
   addCustomLocation: (location: CustomLocation) => void;
   removeCustomLocation: (id: string) => void;
+  setSelectedLocationId: (id: string | null) => void;
+  toggleFavoriteLocation: (id: string) => void;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
 
-export const useLocationContext = () => {
-  const context = useContext(LocationContext);
-  if (!context) {
-    throw new Error('useLocationContext must be used within a LocationProvider');
-  }
-  return context;
-};
+interface LocationProviderProps {
+  children: ReactNode;
+}
 
-export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [customLocations, setCustomLocations] = useState<CustomLocation[]>(() => {
-    try {
-      const storedLocations = localStorage.getItem('customLocations');
-      return storedLocations ? JSON.parse(storedLocations) : [];
-    } catch (error) {
-      console.error("Error reading from localStorage", error);
-      return [];
-    }
-  });
+export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) => {
+  const [customLocations, setCustomLocations] = useState<CustomLocation[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [favoriteLocations, setFavoriteLocations] = useState<string[]>([]);
 
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(() => {
-    try {
-      const storedId = localStorage.getItem('selectedLocationId');
-      return storedId ? JSON.parse(storedId) : null;
-    } catch (error) {
-      console.error("Error reading from localStorage", error);
-      return null;
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const storedLocations = localStorage.getItem('customLocations');
+    const storedSelected = localStorage.getItem('selectedLocationId');
+    const storedFavorites = localStorage.getItem('favoriteLocations');
+    
+    if (storedLocations) {
+      try {
+        setCustomLocations(JSON.parse(storedLocations));
+      } catch (error) {
+        console.error('Failed to parse stored locations:', error);
+      }
     }
-  });
+    
+    if (storedSelected) {
+      setSelectedLocationId(storedSelected);
+    }
+
+    if (storedFavorites) {
+      try {
+        setFavoriteLocations(JSON.parse(storedFavorites));
+      } catch (error) {
+        console.error('Failed to parse stored favorites:', error);
+      }
+    }
+  }, []);
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    localStorage.setItem('customLocations', JSON.stringify(customLocations));
+  }, [customLocations]);
+
+  useEffect(() => {
+    if (selectedLocationId) {
+      localStorage.setItem('selectedLocationId', selectedLocationId);
+    } else {
+      localStorage.removeItem('selectedLocationId');
+    }
+  }, [selectedLocationId]);
+
+  useEffect(() => {
+    localStorage.setItem('favoriteLocations', JSON.stringify(favoriteLocations));
+  }, [favoriteLocations]);
 
   const addCustomLocation = (location: CustomLocation) => {
-    setCustomLocations(prevLocations => {
-      // Avoid adding duplicates
-      if (prevLocations.some(l => l.id === location.id)) {
-        return prevLocations;
-      }
-      return [...prevLocations, location];
+    setCustomLocations(prev => {
+      const exists = prev.find(loc => loc.id === location.id);
+      if (exists) return prev;
+      return [...prev, location];
     });
   };
 
   const removeCustomLocation = (id: string) => {
-    setCustomLocations(prevLocations => prevLocations.filter(l => l.id !== id));
-    // If the removed location was the selected one, reset to current location
+    setCustomLocations(prev => prev.filter(loc => loc.id !== id));
+    setFavoriteLocations(prev => prev.filter(favId => favId !== id));
     if (selectedLocationId === id) {
       setSelectedLocationId(null);
     }
   };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('customLocations', JSON.stringify(customLocations));
-    } catch (error) {
-      console.error("Error writing to localStorage", error);
-    }
-  }, [customLocations]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('selectedLocationId', JSON.stringify(selectedLocationId));
-    } catch (error) {
-      console.error("Error writing to localStorage", error);
-    }
-  }, [selectedLocationId]);
+  const toggleFavoriteLocation = (id: string) => {
+    setFavoriteLocations(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(favId => favId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
 
   return (
-    <LocationContext.Provider
-      value={{
-        customLocations,
-        selectedLocationId,
-        setSelectedLocationId,
-        addCustomLocation,
-        removeCustomLocation,
-      }}
-    >
+    <LocationContext.Provider value={{
+      customLocations,
+      selectedLocationId,
+      favoriteLocations,
+      addCustomLocation,
+      removeCustomLocation,
+      setSelectedLocationId,
+      toggleFavoriteLocation,
+    }}>
       {children}
     </LocationContext.Provider>
   );
+};
+
+export const useLocationContext = () => {
+  const context = useContext(LocationContext);
+  if (context === undefined) {
+    throw new Error('useLocationContext must be used within a LocationProvider');
+  }
+  return context;
 };

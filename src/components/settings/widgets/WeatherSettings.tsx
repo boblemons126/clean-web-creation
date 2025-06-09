@@ -4,16 +4,19 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { MapPin, Thermometer, RefreshCw, Move, Wind, Cloud, Palette, Check, Sun, Droplets, Trash2, Search, Loader2, Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, Thermometer, RefreshCw, Move, Wind, Sun, Droplets, Trash2, Plus, Star, StarOff, Search, Loader2, Navigation } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { getWeatherIcon } from '@/utils/weatherUtils';
-import { useLocationContext, CustomLocation } from '@/contexts/LocationContext';
-import { searchLocationsEnhanced } from '@/services/locationSearchService';
-import { Input } from '@/components/ui/input';
+import { useLocationContext } from '@/contexts/LocationContext';
+import { enhancedLocationService, LocationSearchResult, UserLocation } from '@/services/enhancedLocationService';
+import { useDebounce } from 'use-debounce';
+import { cn } from '@/lib/utils';
 
 // Expanded color presets with more shades
 const colorPresets = [
@@ -55,10 +58,14 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
   const [hoveredColor, setHoveredColor] = useState<string | null>(null);
   
   // Location Search State
-  const { customLocations, addCustomLocation, removeCustomLocation } = useLocationContext();
+  const { customLocations, addCustomLocation, removeCustomLocation, favoriteLocations, toggleFavoriteLocation } = useLocationContext();
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [debouncedQuery] = useDebounce(searchQuery, 150);
+  const [searchResults, setSearchResults] = useState<LocationSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [nearbyLocations, setNearbyLocations] = useState<LocationSearchResult[]>([]);
+  const [showAllLocations, setShowAllLocations] = useState(false);
   
   // HSL state for color picker
   const [hue, setHue] = useState(0);
@@ -70,20 +77,51 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
+  // Get user location and nearby locations
   useEffect(() => {
-    if (searchQuery) {
-      const performSearch = async () => {
-        setIsSearching(true);
-        const results = await searchLocationsEnhanced(searchQuery);
-        setSearchResults(results);
-        setIsSearching(false);
-      };
-      performSearch();
-    } else {
-      setSearchResults([]);
-    }
-  }, [searchQuery]);
+    const getUserLocation = async () => {
+      const location = await enhancedLocationService.getCurrentUserLocation();
+      setUserLocation(location);
+      
+      if (location) {
+        // Get nearby locations
+        const nearby = await enhancedLocationService.searchLocations('', location, 8, true);
+        setNearbyLocations(nearby);
+      }
+    };
 
+    getUserLocation();
+  }, []);
+
+  // Enhanced search with fuzzy matching
+  useEffect(() => {
+    const searchLocations = async () => {
+      if (debouncedQuery.length < 1) {
+        setSearchResults([]);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const directResults = await enhancedLocationService.searchLocations(
+          debouncedQuery,
+          userLocation || undefined,
+          10
+        );
+
+        setSearchResults(directResults);
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    searchLocations();
+  }, [debouncedQuery, userLocation]);
+
+  // Handle dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
@@ -98,7 +136,6 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
     };
 
     const body = document.body;
-
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
@@ -127,7 +164,10 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
       if (w.id === 'weather') {
         return {
           ...w,
-          config: { ...w.config, ...newConfig }
+          config: {
+            ...w.config,
+            ...newConfig
+          }
         };
       }
       return w;
@@ -151,6 +191,61 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
     const hex = hslToHex(hue, saturation, lightness);
     updateConfig({ customBackgroundColor: hex });
   };
+
+  const handleAddLocation = (location: LocationSearchResult) => {
+    const customLocation = {
+      id: `${location.latitude},${location.longitude}`,
+      name: location.name,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      county: location.county,
+      country: location.country,
+      postcode: location.postcode,
+      type: location.type,
+    };
+
+    addCustomLocation(customLocation);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const getLocationIcon = (type: LocationSearchResult['type']) => {
+    switch (type) {
+      case 'city': return '🏙️';
+      case 'town': return '🏘️';
+      case 'village': return '🏡';
+      case 'postcode': return '📮';
+      case 'county': return '🗺️';
+      default: return '📍';
+    }
+  };
+
+  const formatFullLocationDetails = (location: any) => {
+    const parts = [];
+    if (location.name) parts.push(location.name);
+    if (location.postcode) parts.push(location.postcode);
+    if (location.county) parts.push(location.county);
+    if (location.country) parts.push(location.country);
+    return parts.join(', ');
+  };
+
+  const formatLocationSubtext = (location: LocationSearchResult) => {
+    const parts = [];
+    if (location.postcode) parts.push(location.postcode);
+    if (location.county) parts.push(location.county);
+    if (location.country && location.country !== 'United Kingdom') parts.push(location.country);
+    else if (!location.country || location.country === 'United Kingdom') parts.push('UK');
+    return parts.join(', ');
+  };
+
+  // Separate locations into visible and faded groups - showing only 2 before fade
+  const visibleLocationCount = 2;
+  const favoriteCustomLocations = customLocations.filter(loc => favoriteLocations.includes(loc.id));
+  const regularCustomLocations = customLocations.filter(loc => !favoriteLocations.includes(loc.id));
+  
+  const allSortedLocations = [...favoriteCustomLocations, ...regularCustomLocations];
+  const visibleLocations = showAllLocations ? allSortedLocations : allSortedLocations.slice(0, visibleLocationCount);
+  const fadedLocations = showAllLocations ? [] : allSortedLocations.slice(visibleLocationCount);
 
   const WeatherWidgetPreview = ({ color }: { color: string }) => {
     const defaultGlow = 15; // Default glow amount for visual aesthetics
@@ -543,60 +638,247 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
             />
           </div>
 
+          {/* Enhanced Location Search */}
           <div className="space-y-4">
-            <Label className="text-white">Add Custom Location</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Search for a city or postcode..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-white/10 border-white/20 text-white"
-              />
-              {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
+            <div>
+              <Label className="text-white flex items-center">
+                <Star className="w-4 h-4 mr-2 text-yellow-400" />
+                Add New Location
+              </Label>
+              <p className="text-sm text-gray-300">Search and add locations worldwide</p>
             </div>
-            {searchResults.length > 0 && (
-              <div className="bg-white/5 border border-white/10 rounded-lg max-h-48 overflow-y-auto">
-                <ul className="divide-y divide-white/10">
-                  {searchResults.map((result) => (
-                    <li
-                      key={result.latitude + result.longitude}
-                      className="p-3 hover:bg-white/10 cursor-pointer flex items-center justify-between"
-                      onClick={() => {
-                        addCustomLocation({
-                          id: `${result.latitude},${result.longitude}`,
-                          name: result.name,
-                          latitude: result.latitude,
-                          longitude: result.longitude,
-                        });
-                        setSearchQuery('');
-                      }}
-                    >
-                      <div>
-                        <p className="font-medium text-white">{result.name}</p>
-                        <p className="text-xs text-gray-400">{result.state || result.country}</p>
-                      </div>
-                      <Plus className="w-4 h-4 text-green-400" />
-                    </li>
-                  ))}
-                </ul>
+
+            <Card className="bg-white/5 border-white/10 p-4">
+              <div className="space-y-4">
+                {/* Search Input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search for any location..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:bg-white/15 transition-all"
+                  />
+                  {isSearching && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+                  )}
+                </div>
+
+                {/* Nearby Locations - small bubbles */}
+                {!searchQuery && userLocation && nearbyLocations.length > 0 && (
+                  <div>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Navigation className="w-3 h-3 text-blue-400" />
+                      <span className="text-xs text-white font-medium">📍 Nearby Locations</span>
+                      <span className="text-xs text-gray-400">({nearbyLocations.length} found)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {nearbyLocations.slice(0, 12).map((location) => (
+                        <button
+                          key={location.id}
+                          onClick={() => handleAddLocation(location)}
+                          className="bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-full px-3 py-1.5 transition-all duration-200 group"
+                        >
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-xs">{getLocationIcon(location.type)}</span>
+                            <span className="text-xs text-white font-medium truncate max-w-[100px]">
+                              {location.name}
+                            </span>
+                            <Plus className="w-2.5 h-2.5 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Enhanced Search Results */}
+                {searchResults.length > 0 && searchQuery && (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    <div className="text-sm text-white font-medium mb-2">
+                      🔍 Search Results ({searchResults.length} results)
+                    </div>
+                    {searchResults.map((location, index) => {
+                      return (
+                        <div
+                          key={location.id}
+                          className="flex items-center justify-between p-3 rounded-lg border transition-colors group cursor-pointer bg-white/5 border-white/10 hover:bg-white/10"
+                          onClick={() => handleAddLocation(location)}
+                        >
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <span className="text-lg">{getLocationIcon(location.type)}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium text-white truncate">
+                                  {location.name}
+                                </span>
+                                {location.distance !== undefined && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full text-blue-200 bg-blue-500/20">
+                                    📏 {location.distance}km away
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-400 truncate mt-1">
+                                📍 {formatLocationSubtext(location)}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white opacity-0 group-hover:opacity-100 transition-opacity ml-3"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddLocation(location);
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* No Results */}
+                {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
+                  <div className="bg-white/5 border-white/10 p-6 text-center rounded-lg">
+                    <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-white font-medium mb-1">❌ No locations found</p>
+                    <p className="text-sm text-gray-400">
+                      Try a different search term or check spelling
+                    </p>
+                  </div>
+                )}
               </div>
+            </Card>
+
+            {/* Updated Saved Locations List with emojis and brighter gold favorites */}
+            {customLocations.length > 0 ? (
+              <div className="space-y-2">
+                <Label className="text-white text-sm">💾 Saved Locations ({customLocations.length})</Label>
+                <div className="grid gap-2">
+                  {/* Visible Locations - only show 2 before fade */}
+                  {visibleLocations.map((location) => {
+                    const isFavorite = favoriteLocations.includes(location.id);
+                    return (
+                      <div 
+                        key={location.id} 
+                        className={cn(
+                          "flex items-center justify-between p-4 rounded-lg border transition-colors group",
+                          isFavorite 
+                            ? "bg-yellow-400/20 border-yellow-400/40 hover:bg-yellow-400/30" 
+                            : "bg-white/5 border-white/10 hover:bg-white/10"
+                        )}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={cn(
+                            "p-2 rounded-lg",
+                            isFavorite 
+                              ? "bg-yellow-400/30" 
+                              : "bg-blue-500/20"
+                          )}>
+                            <span className="text-base">{getLocationIcon(location.type)}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-white font-medium">{location.name}</span>
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              📍 {formatFullLocationDetails(location)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => toggleFavoriteLocation(location.id)}
+                            className={cn(
+                              "hover:bg-yellow-400/20",
+                              isFavorite ? "text-yellow-300" : "text-yellow-400 hover:text-yellow-300"
+                            )}
+                          >
+                            {isFavorite ? (
+                              <StarOff className="w-4 h-4" />
+                            ) : (
+                              <Star className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => removeCustomLocation(location.id)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Faded Locations */}
+                  {fadedLocations.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60 rounded-lg pointer-events-none z-10" />
+                        <div className="opacity-50 space-y-2 max-h-32 overflow-hidden">
+                          {fadedLocations.map((location) => {
+                            const isFavorite = favoriteLocations.includes(location.id);
+                            return (
+                              <div 
+                                key={location.id} 
+                                className={cn(
+                                  "flex items-center justify-between p-4 rounded-lg border transition-colors group",
+                                  isFavorite 
+                                    ? "bg-yellow-400/20 border-yellow-400/40" 
+                                    : "bg-white/5 border-white/10"
+                                )}
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <div className={cn(
+                                    "p-2 rounded-lg",
+                                    isFavorite 
+                                      ? "bg-yellow-400/30" 
+                                      : "bg-blue-500/20"
+                                  )}>
+                                    <span className="text-base">{getLocationIcon(location.type)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-white font-medium">{location.name}</span>
+                                    <p className="text-xs text-gray-400">
+                                      📍 {formatFullLocationDetails(location)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowAllLocations(!showAllLocations)}
+                        className="w-full bg-white/5 border-white/20 text-white hover:bg-white/10"
+                      >
+                        {showAllLocations ? 'Show Less Locations' : `Show ${fadedLocations.length} More Locations`}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <Card className="bg-white/5 border-white/10 p-6 text-center">
+                <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-white font-medium mb-1">📍 No custom locations yet</p>
+                <p className="text-sm text-gray-400">
+                  Start typing in the search box above to add your first location
+                </p>
+              </Card>
             )}
           </div>
-
-          {customLocations.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-white">Saved Locations</Label>
-              {customLocations.map((location) => (
-                <div key={location.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                  <span className="text-white">{location.name}</span>
-                  <Button variant="ghost" size="sm" onClick={() => removeCustomLocation(location.id)}>
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
 

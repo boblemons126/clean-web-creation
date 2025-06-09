@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { MapPin, RefreshCw } from 'lucide-react';
 import LocationDropdown from '../location/LocationDropdown';
@@ -5,6 +6,8 @@ import LocationDropdown from '../location/LocationDropdown';
 interface WeatherHeaderProps {
   location: string;
   county?: string;
+  deviceLocation?: string;
+  deviceCounty?: string;
   onRefresh: () => void;
   onLocationChange?: (locationId: string | null) => void;
   hideRefreshButton?: boolean;
@@ -13,6 +16,8 @@ interface WeatherHeaderProps {
 const WeatherHeader: React.FC<WeatherHeaderProps> = ({ 
   location, 
   county, 
+  deviceLocation,
+  deviceCounty,
   onRefresh, 
   onLocationChange,
   hideRefreshButton = false
@@ -24,6 +29,8 @@ const WeatherHeader: React.FC<WeatherHeaderProps> = ({
           <LocationDropdown 
             currentLocation={location}
             currentCounty={county}
+            deviceLocation={deviceLocation}
+            deviceCounty={deviceCounty}
             onLocationChange={onLocationChange}
           />
         ) : (
@@ -49,4 +56,4 @@ const WeatherHeader: React.FC<WeatherHeaderProps> = ({
   );
 };
 
-export default WeatherHeader; 
+export default WeatherHeader;

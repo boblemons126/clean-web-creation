@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { RefreshCw, Palette } from 'lucide-react';
 import { useWeatherData } from '../../hooks/useWeatherData';
@@ -25,7 +26,7 @@ const colorPresets = [
 ];
 
 const WeatherWidget = () => {
-  const { weather, loading, error, lastUpdated, refetch, handleLocationChange } = useWeatherData();
+  const { weather, loading, error, lastUpdated, deviceLocation, refetch, handleLocationChange } = useWeatherData();
   const { setSelectedLocationId } = useLocationContext();
   const { settings } = useSettings();
   const weatherSettings = settings.widgets.find(w => w.id === 'weather')?.config || {};
@@ -132,6 +133,8 @@ const WeatherWidget = () => {
             <WeatherHeader 
               location={convertedWeather.location}
               county={convertedWeather.county}
+              deviceLocation={deviceLocation?.location}
+              deviceCounty={deviceLocation?.county}
               onRefresh={refetch}
               onLocationChange={onLocationChange}
               hideRefreshButton={true}

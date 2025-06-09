@@ -6,6 +6,8 @@ import LocationDropdown from './LocationDropdown';
 interface WeatherHeaderProps {
   location: string;
   county?: string;
+  deviceLocation?: string;
+  deviceCounty?: string;
   onRefresh: () => void;
   onLocationChange?: (locationId: string | null) => void;
   hideRefreshButton?: boolean;
@@ -14,6 +16,8 @@ interface WeatherHeaderProps {
 const WeatherHeader: React.FC<WeatherHeaderProps> = ({ 
   location, 
   county, 
+  deviceLocation,
+  deviceCounty,
   onRefresh, 
   onLocationChange,
   hideRefreshButton = false
@@ -25,6 +29,8 @@ const WeatherHeader: React.FC<WeatherHeaderProps> = ({
           <LocationDropdown 
             currentLocation={location}
             currentCounty={county}
+            deviceLocation={deviceLocation}
+            deviceCounty={deviceCounty}
             onLocationChange={onLocationChange}
           />
         ) : (

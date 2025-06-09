@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { getWeatherData } from '../services/weather';
 import type { WeatherData } from '../types/weather';
@@ -8,6 +9,7 @@ export const useWeatherData = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [deviceLocation, setDeviceLocation] = useState<{ location: string; county?: string } | null>(null);
   const { customLocations, selectedLocationId, setSelectedLocationId } = useLocationContext();
 
   const fetchWeatherData = useCallback(async () => {
@@ -39,6 +41,14 @@ export const useWeatherData = () => {
       const weatherData = await getWeatherData(latitude, longitude);
       console.log('Weather data received:', weatherData);
       
+      // If this is device location (no custom location selected), store it as device location
+      if (!selectedLocationId) {
+        setDeviceLocation({
+          location: weatherData.location,
+          county: weatherData.county
+        });
+      }
+      
       setWeather(weatherData);
       setLastUpdated(new Date());
     } catch (error) {
@@ -69,6 +79,7 @@ export const useWeatherData = () => {
     loading,
     error,
     lastUpdated,
+    deviceLocation,
     refetch: fetchWeatherData,
     handleLocationChange: setSelectedLocationId
   };

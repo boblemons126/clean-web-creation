@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Thermometer, RefreshCw, Move, Wind, Sun, Droplets, Trash2, Plus, Star, StarOff, Search, Loader2, Navigation } from 'lucide-react';
+import { MapPin, Thermometer, RefreshCw, Move, Wind, Sun, Droplets, Trash2, Plus, Star, StarOff, Search, Loader2, Navigation, Settings, Globe, Key } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,6 +17,20 @@ import { useLocationContext } from '@/contexts/LocationContext';
 import { enhancedLocationService, LocationSearchResult, UserLocation } from '@/services/enhancedLocationService';
 import { useDebounce } from 'use-debounce';
 import { cn } from '@/lib/utils';
+
+// Popular weather APIs
+const popularWeatherAPIs = [
+  { id: 'openweathermap', name: 'OpenWeatherMap', url: 'api.openweathermap.org', description: 'Free tier available, widely used' },
+  { id: 'weatherapi', name: 'WeatherAPI', url: 'api.weatherapi.com', description: 'Free tier with 1M calls/month' },
+  { id: 'accuweather', name: 'AccuWeather', url: 'dataservice.accuweather.com', description: 'Professional weather data' },
+  { id: 'weatherbit', name: 'Weatherbit', url: 'api.weatherbit.io', description: 'Real-time weather data' },
+  { id: 'climacell', name: 'ClimaCell (Tomorrow.io)', url: 'api.tomorrow.io', description: 'Hyperlocal weather data' },
+  { id: 'visualcrossing', name: 'Visual Crossing', url: 'weather.visualcrossing.com', description: 'Historical and forecast data' },
+  { id: 'meteostat', name: 'Meteostat', url: 'api.meteostat.net', description: 'Historical weather data' },
+  { id: 'weatherunlocked', name: 'Weather Unlocked', url: 'api.weatherunlocked.com', description: 'Global weather API' },
+  { id: 'apixu', name: 'APIXU (WeatherStack)', url: 'api.weatherstack.com', description: 'Real-time weather API' },
+  { id: 'darksky', name: 'Dark Sky (Apple)', url: 'api.darksky.net', description: 'Deprecated but still popular' }
+];
 
 // Expanded color presets with more shades
 const colorPresets = [
@@ -44,6 +58,14 @@ const hueGradient = [
   'hsl(360, 100%, 50%)'   // Red again
 ];
 
+interface WeatherSource {
+  id: string;
+  name: string;
+  url: string;
+  apiKey?: string;
+  isPrimary?: boolean;
+}
+
 interface WeatherSettingsProps {
   onSettingsChange: () => void;
 }
@@ -56,6 +78,17 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState('picker');
   const [hoveredColor, setHoveredColor] = useState<string | null>(null);
+  
+  // Weather API State
+  const [weatherSources, setWeatherSources] = useState<WeatherSource[]>(
+    config.weatherSources || [
+      { id: 'openweathermap', name: 'OpenWeatherMap', url: 'api.openweathermap.org', isPrimary: true },
+      { id: 'weatherapi', name: 'WeatherAPI', url: 'api.weatherapi.com' }
+    ]
+  );
+  const [selectedAPI, setSelectedAPI] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [showAPIKeyInput, setShowAPIKeyInput] = useState(false);
   
   // Location Search State
   const { customLocations, addCustomLocation, removeCustomLocation, favoriteLocations, toggleFavoriteLocation } = useLocationContext();
@@ -174,6 +207,50 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
     });
     updateWidgetSettings(updatedWidgets);
     onSettingsChange();
+  };
+
+  // Weather API Management Functions
+  const handleAPISelection = (apiId: string) => {
+    setSelectedAPI(apiId);
+    setShowAPIKeyInput(true);
+    setApiKey('');
+  };
+
+  const addWeatherAPI = () => {
+    if (!selectedAPI || !apiKey.trim()) return;
+    
+    const selectedAPIData = popularWeatherAPIs.find(api => api.id === selectedAPI);
+    if (!selectedAPIData) return;
+    
+    const newSource: WeatherSource = {
+      id: Date.now().toString(),
+      name: selectedAPIData.name,
+      url: selectedAPIData.url,
+      apiKey: apiKey.trim()
+    };
+    
+    const updatedSources = [...weatherSources, newSource];
+    setWeatherSources(updatedSources);
+    updateConfig({ weatherSources: updatedSources });
+    
+    setSelectedAPI('');
+    setApiKey('');
+    setShowAPIKeyInput(false);
+  };
+
+  const removeWeatherSource = (id: string) => {
+    const updatedSources = weatherSources.filter(source => source.id !== id);
+    setWeatherSources(updatedSources);
+    updateConfig({ weatherSources: updatedSources });
+  };
+
+  const setPrimarySource = (id: string) => {
+    const updatedSources = weatherSources.map(source => ({
+      ...source,
+      isPrimary: source.id === id
+    }));
+    setWeatherSources(updatedSources);
+    updateConfig({ weatherSources: updatedSources });
   };
 
   const hslToHex = (h: number, s: number, l: number) => {
@@ -886,10 +963,10 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
             Update Settings
           </CardTitle>
           <CardDescription className="text-blue-200">
-            Configure how often the weather data updates
+            Configure how often the weather data updates and manage weather sources
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-white">Auto Refresh</Label>
@@ -922,6 +999,132 @@ const WeatherSettings: React.FC<WeatherSettingsProps> = ({ onSettingsChange }) =
               </Select>
             </div>
           )}
+
+          {/* Add Custom Weather API */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Globe className="w-5 h-5 text-blue-400" />
+              <Label className="text-white text-lg">Add Custom Weather API</Label>
+            </div>
+            <p className="text-sm text-gray-300">Manage your weather data sources and APIs</p>
+
+            {/* Existing Sources */}
+            <div className="space-y-2">
+              {weatherSources.map((source) => (
+                <div
+                  key={source.id}
+                  className={cn(
+                    "flex items-center justify-between p-4 rounded-lg border transition-colors group",
+                    source.isPrimary 
+                      ? "bg-blue-500/20 border-blue-400/40 hover:bg-blue-500/30" 
+                      : "bg-white/5 border-white/10 hover:bg-white/10"
+                  )}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      source.isPrimary 
+                        ? "bg-blue-500/30" 
+                        : "bg-gray-500/20"
+                    )}>
+                      <Globe className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white font-medium">{source.name}</span>
+                        {source.isPrimary && (
+                          <Badge className="bg-blue-500/30 text-blue-200 text-xs">Primary</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400">{source.url}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {!source.isPrimary && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setPrimarySource(source.id)}
+                        className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                        title="Set as primary source"
+                      >
+                        <Star className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => removeWeatherSource(source.id)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                      disabled={weatherSources.length <= 1}
+                      title="Remove source"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New API */}
+            <Card className="bg-white/5 border-white/10 p-4">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Plus className="w-4 h-4 text-green-400" />
+                  <span className="text-white font-medium">Add New Weather API</span>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-white text-sm mb-2 block">Select Weather API</Label>
+                    <Select value={selectedAPI} onValueChange={handleAPISelection}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Choose a weather API..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-white/10">
+                        {popularWeatherAPIs.map((api) => (
+                          <SelectItem key={api.id} value={api.id} className="text-white hover:bg-white/10">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{api.name}</span>
+                              <span className="text-xs text-gray-400">{api.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {showAPIKeyInput && selectedAPI && (
+                    <div>
+                      <Label className="text-white text-sm mb-2 block flex items-center">
+                        <Key className="w-4 h-4 mr-2" />
+                        API Key for {popularWeatherAPIs.find(api => api.id === selectedAPI)?.name}
+                      </Label>
+                      <Input
+                        type="password"
+                        placeholder="Enter your API key..."
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:bg-white/15"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Your API key will be stored securely and used to fetch weather data from this source.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <Button
+                  onClick={addWeatherAPI}
+                  disabled={!selectedAPI || !apiKey.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add API Source
+                </Button>
+              </div>
+            </Card>
+          </div>
         </CardContent>
       </Card>
     </div>

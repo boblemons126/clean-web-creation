@@ -1,29 +1,17 @@
 
 import React, { useState } from 'react';
-import { RefreshCw, Palette } from 'lucide-react';
+import { RefreshCw, Settings } from 'lucide-react';
 import { useWeatherData } from '../../hooks/useWeatherData';
 import { useLocationContext } from '../../contexts/LocationContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import WeatherHeader from './WeatherHeader';
 import CurrentWeather from './CurrentWeather';
 import WeatherDetails from './WeatherDetails';
 import ForecastToggle from './ForecastToggle';
 import WeatherForecast from './WeatherForecast';
+import WeatherSettings from '../settings/widgets/WeatherSettings';
 import { getGradientByCondition } from '../../utils/weatherUtils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import CustomColorPicker from './CustomColorPicker';
-
-const colorPresets = [
-  { name: 'Blue', value: '#1e3a8a' },
-  { name: 'Purple', value: '#5b21b6' },
-  { name: 'Pink', value: '#db2777' },
-  { name: 'Green', value: '#065f46' },
-  { name: 'Orange', value: '#9a3412' },
-  { name: 'Red', value: '#991b1b' },
-  { name: 'Gray', value: '#1f2937' },
-  { name: 'Teal', value: '#0f766e' },
-];
 
 const WeatherWidget = () => {
   const { weather, loading, error, lastUpdated, deviceLocation, refetch, handleLocationChange } = useWeatherData();
@@ -31,6 +19,7 @@ const WeatherWidget = () => {
   const { settings } = useSettings();
   const weatherSettings = settings.widgets.find(w => w.id === 'weather')?.config || {};
   const [showHourly, setShowHourly] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   const onLocationChange = (locationId: string | null) => {
     setSelectedLocationId(locationId);
@@ -117,74 +106,90 @@ const WeatherWidget = () => {
   if (!convertedWeather) return null;
 
   return (
-    <div 
-      className={`${getBackgroundClass()} rounded-2xl p-6 text-white shadow-xl relative overflow-hidden`}
-      style={getBackgroundStyle()}
-    >
-      {/* Background decoration */}
-      <div className="absolute inset-0 bg-black/10"></div>
-      <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full"></div>
-      <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-white/5 rounded-full"></div>
-      
-      <div className="relative z-10">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-start space-x-1 mt-1">
-            <WeatherHeader 
-              location={convertedWeather.location}
-              county={convertedWeather.county}
-              deviceLocation={deviceLocation?.location}
-              deviceCounty={deviceLocation?.county}
-              onRefresh={refetch}
-              onLocationChange={onLocationChange}
-              hideRefreshButton={true}
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <button onClick={refetch} className="p-2 hover:bg-white/20 rounded-lg transition-colors" title="Refresh weather data">
-              <RefreshCw className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+    <>
+      <div 
+        className={`${getBackgroundClass()} rounded-2xl p-6 text-white shadow-xl relative overflow-hidden`}
+        style={getBackgroundStyle()}
+      >
+        {/* Background decoration */}
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full"></div>
+        <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-white/5 rounded-full"></div>
         
-        <CurrentWeather 
-          temperature={convertedWeather.temperature}
-          condition={convertedWeather.condition}
-          description={convertedWeather.description}
-          feelsLike={convertedWeather.feelsLike}
-        />
-        
-        {(weatherSettings.showAdvancedInfo ?? true) && (
-          <WeatherDetails 
-            humidity={convertedWeather.humidity}
-            windSpeed={convertedWeather.windSpeed}
-            windDirection={convertedWeather.windDirection}
-            sunset={convertedWeather.sunset}
+        <div className="relative z-10">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-6">
+            <div className="flex items-start space-x-1 mt-1">
+              <WeatherHeader 
+                location={convertedWeather.location}
+                county={convertedWeather.county}
+                deviceLocation={deviceLocation?.location}
+                deviceCounty={deviceLocation?.county}
+                onRefresh={refetch}
+                onLocationChange={onLocationChange}
+                hideRefreshButton={true}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <button 
+                onClick={() => setShowSettings(true)} 
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors" 
+                title="Weather settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          
+          <CurrentWeather 
+            temperature={convertedWeather.temperature}
+            condition={convertedWeather.condition}
+            description={convertedWeather.description}
+            feelsLike={convertedWeather.feelsLike}
           />
-        )}
-        
-        {(weatherSettings.showForecastInfo ?? true) && (
-          <>
-            <ForecastToggle 
-              showHourly={showHourly}
-              onToggle={setShowHourly}
+          
+          {(weatherSettings.showAdvancedInfo ?? true) && (
+            <WeatherDetails 
+              humidity={convertedWeather.humidity}
+              windSpeed={convertedWeather.windSpeed}
+              windDirection={convertedWeather.windDirection}
+              sunset={convertedWeather.sunset}
             />
-            
-            <WeatherForecast 
-              showHourly={showHourly}
-              hourlyForecast={convertedWeather.hourlyForecast}
-              dailyForecast={convertedWeather.dailyForecast}
-            />
-          </>
-        )}
-        
-        {lastUpdated && (
-          <div className="text-xs opacity-60 mt-4 text-center">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </div>
-        )}
+          )}
+          
+          {(weatherSettings.showForecastInfo ?? true) && (
+            <>
+              <ForecastToggle 
+                showHourly={showHourly}
+                onToggle={setShowHourly}
+              />
+              
+              <WeatherForecast 
+                showHourly={showHourly}
+                hourlyForecast={convertedWeather.hourlyForecast}
+                dailyForecast={convertedWeather.dailyForecast}
+              />
+            </>
+          )}
+          
+          {lastUpdated && (
+            <div className="text-xs opacity-60 mt-4 text-center">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="bg-slate-900 border-white/10 text-white max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Weather Widget Settings</DialogTitle>
+          </DialogHeader>
+          <WeatherSettings onSettingsChange={() => {}} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

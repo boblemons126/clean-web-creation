@@ -58,13 +58,27 @@ interface SettingsContextType {
   hasUnsavedChanges: boolean;
 }
 
+export interface WeatherSource {
+  id: string;
+  name: string;
+  url: string;
+  isPrimary?: boolean;
+  apiKey?: string;
+}
+
 const defaultSettings: Settings = {
   widgets: [
     { 
       id: 'weather', 
       enabled: true, 
       position: 0,
-      config: { useDynamicColoring: true }
+      config: { 
+        useDynamicColoring: true,
+        weatherSources: [
+          { id: 'openweathermap', name: 'OpenWeatherMap', url: 'api.openweathermap.org', isPrimary: true },
+          { id: 'weatherapi', name: 'WeatherAPI', url: 'api.weatherapi.com' }
+        ]
+      }
     },
     { id: 'calendar', enabled: true, position: 1 },
     { id: 'news', enabled: true, position: 2 },
@@ -111,12 +125,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
-        // Ensure the weather widget has the useDynamicColoring setting
+        // Ensure the weather widget has the useDynamicColoring setting and default weather sources
         const updatedWidgets = parsed.widgets.map((widget: WidgetSettings) => {
-          if (widget.id === 'weather' && !widget.config?.hasOwnProperty('useDynamicColoring')) {
+          if (widget.id === 'weather') {
+            const weatherConfig = widget.config || {};
             return {
               ...widget,
-              config: { ...widget.config, useDynamicColoring: true }
+              config: { 
+                ...weatherConfig, 
+                useDynamicColoring: weatherConfig.hasOwnProperty('useDynamicColoring') ? weatherConfig.useDynamicColoring : true,
+                weatherSources: weatherConfig.weatherSources || [
+                  { id: 'openweathermap', name: 'OpenWeatherMap', url: 'api.openweathermap.org', isPrimary: true },
+                  { id: 'weatherapi', name: 'WeatherAPI', url: 'api.weatherapi.com' }
+                ]
+              }
             };
           }
           return widget;
